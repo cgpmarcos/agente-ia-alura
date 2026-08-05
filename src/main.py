@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader, UnstructuredMarkdownLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
@@ -13,21 +13,47 @@ from langchain_core.output_parsers import StrOutputParser
 load_dotenv()
 
 def format_docs(docs):
+    """Formata os documentos recuperados unindo seus conteúdos com quebras de linha."""
     return "\n\n".join(doc.page_content for doc in docs)
 
 def iniciar_agente_animal_pets():
-    # Caminho do PDF dentro da pasta data
-    caminho_pdf = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "Perguntas Frequentes (FAQ) - Animal Pets.pdf"))
+    # Caminho da PASTA data onde ficam os PDFs e arquivos Markdown
+    caminho_pasta_data = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
     
-    if not os.path.exists(caminho_pdf):
-        raise FileNotFoundError(f"⚠️ PDF não encontrado em: {caminho_pdf}")
+    if not os.path.exists(caminho_pasta_data):
+        raise FileNotFoundError(f"⚠️ Pasta de dados não encontrada em: {caminho_pasta_data}")
 
-    # 1. Carrega o conteúdo do PDF da Animal Pets
-    loader = PyPDFLoader(caminho_pdf)
-    documentos = loader.load()
+    documentos = []
     
-    # 2. Divide o texto em blocos menores (chunks)
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=100)
+    print("📂 Carregando arquivos da pasta data:")
+    # Varre a pasta carregando cada arquivo com o leitor correto conforme a extensão
+    for arquivo in os.listdir(caminho_pasta_data):
+        caminho_completo = os.path.join(caminho_pasta_data, arquivo)
+        nome_minusculo = arquivo.lower()
+        
+        # Processamento de arquivos PDF
+        if nome_minusculo.endswith('.pdf'):
+            try:
+                loader = PyPDFLoader(caminho_completo)
+                documentos.extend(loader.load())
+                print(f"  ✅ PDF lido com sucesso: {arquivo}")
+            except Exception as e:
+                print(f"  ❌ Erro ao ler o PDF {arquivo}: {e}")
+                
+        # Processamento de arquivos Markdown (Tabelas de Preços estruturadas)
+        elif nome_minusculo.endswith('.md'):
+            try:
+                loader = UnstructuredMarkdownLoader(caminho_completo)
+                documentos.extend(loader.load())
+                print(f"  🎯 Markdown lido com sucesso: {arquivo}")
+            except Exception as e:
+                print(f"  ❌ Erro ao ler o Markdown {arquivo}: {e}")
+                
+    if not documentos:
+        raise ValueError(f"⚠️ Nenhum conteúdo pôde ser extraído dos arquivos na pasta: {caminho_pasta_data}")
+    
+    # 2. Divide o texto em blocos menores (chunks) - Tamanho ideal para misturar textos e tabelas
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=700, chunk_overlap=150)
     fragmentos = text_splitter.split_documents(documentos)
     
     # 3. Embeddings locais open-source (BAAI)
@@ -35,20 +61,23 @@ def iniciar_agente_animal_pets():
     
     # 4. Armazena temporariamente no banco de vetores ChromaDB
     banco_vetores = Chroma.from_documents(fragmentos, embeddings)
-    retriever = banco_vetores.as_retriever(search_kwargs={"k": 3})
     
-    # 5. Configura o modelo de linguagem ultra rápido da Groq (Llama 3 8B)
-    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.2)
+    # Recupera até 7 blocos de contexto para garantir respostas completas
+    retriever = banco_vetores.as_retriever(search_kwargs={"k": 7}) 
     
-    # Prompt de atendimento da Animal Pets
+    # 5. Configura o modelo de linguagem da Groq (Llama 3.3 70B) com baixa temperatura para precisão
+    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.1)
+    
+    # Prompt de atendimento rigoroso da Animal Pets
     system_prompt = (
         "Você é um assistente de atendimento virtual prestativo, educado e empático da empresa Animal Pets.\n"
-        "Sua missão é ajudar os clientes respondendo às dúvidas com base estrita no FAQ fornecido.\n"
+        "Sua missão é ajudar os clientes respondendo às dúvidas com base estrita nos documentos fornecidos.\n"
         "Regras cruciais:\n"
-        "1. Use apenas as informações do contexto abaixo para responder.\n"
-        "2. Se a informação não estiver no contexto, responda exatamente: 'Desculpe, não encontrei essa informação no meu manual. Por favor, entre em contato com nosso suporte humano para que possamos te ajudar melhor!'\n"
-        "3. Nunca invente dados, telefones ou políticas que não estejam descritas no texto.\n\n"
-        "FAQ / Contexto:\n{context}"
+        "1. Use as informações do contexto fornecido para responder de forma clara.\n"
+        "2. Se a informação realmente não estiver descrita em nenhum dos manuais ou tabelas de preços, responda exatamente: "
+        "'Desculpe, não encontrei essa informação no meu manual. Por favor, entre em contato com nosso suporte humano para que possamos te ajudar melhor!'\n"
+        "3. Nunca invente dados, valores ou políticas que não estejam descritas no texto.\n\n"
+        "Documentos Integrados / Contexto:\n{context}"
     )
     
     prompt = ChatPromptTemplate.from_messages([
@@ -67,7 +96,7 @@ def iniciar_agente_animal_pets():
     return rag_chain
 
 if __name__ == "__main__":
-    print("🤖 Carregando a base de conhecimento da Animal Pets via Groq...")
+    print("🤖 Inicializando a base de conhecimento híbrida (PDF/MD) da Animal Pets...")
     try:
         agente = iniciar_agente_animal_pets()
         print("✅ Agente Animal Pets online e pronto para o atendimento!")
