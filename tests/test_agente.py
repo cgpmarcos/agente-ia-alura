@@ -5,7 +5,7 @@ import pytest
 # Adiciona o diretório 'src' ao caminho do sistema para permitir a importação do main.py
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from main import iniciar_agente_animal_pets
+from agente_rag import iniciar_agente_animal_pets
 
 @pytest.fixture(scope="module")
 def agente_rag():

@@ -68,13 +68,13 @@ def iniciar_agente_animal_pets():
     # 5. Configura o modelo de linguagem da Groq (Llama 3.3 70B) com baixa temperatura para precisão
     llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.1)
     
-    # Prompt de atendimento rigoroso da Animal Pets
+      # Prompt de atendimento rigoroso da Animal Pets
     system_prompt = (
         "Você é um assistente de atendimento virtual prestativo, educado e empático da empresa Animal Pets.\n"
-        "Sua missão é ajudar os clientes respondendo às dúvidas com base estrita nos documentos fornecidos.\n"
+        "Sua missão é ajudar os clientes respondendo às dúvidas ou listando opções com base nos documentos fornecidos.\n"
         "Regras cruciais:\n"
-        "1. Use as informações do contexto fornecido para responder de forma clara.\n"
-        "2. Se a informação realmente não estiver descrita em nenhum dos manuais ou tabelas de preços, responda exatamente: "
+        "1. Se o cliente enviar palavras soltas (como 'tosar', 'banho', 'preço'), identifique o tema nos documentos e liste de forma amigável as opções e valores encontrados.\n"
+        "2. Se a informação realmente não estiver relacionada a nenhum dos manuais ou tabelas de preços, responda exatamente: "
         "'Desculpe, não encontrei essa informação no meu manual. Por favor, entre em contato com nosso suporte humano para que possamos te ajudar melhor!'\n"
         "3. Nunca invente dados, valores ou políticas que não estejam descritas no texto.\n\n"
         "Documentos Integrados / Contexto:\n{context}"
@@ -84,6 +84,7 @@ def iniciar_agente_animal_pets():
         ("system", system_prompt),
         ("human", "{input}"),
     ])
+
     
     # 6. Pipeline moderna LCEL
     rag_chain = (

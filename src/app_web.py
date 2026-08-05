@@ -1,5 +1,5 @@
 import streamlit as st
-from main import iniciar_agente_animal_pets
+from agente_rag import iniciar_agente_animal_pets
 
 # Configuração da página do navegador
 st.set_page_config(page_title="Assistente Animal Pets", page_icon="🐾", layout="centered")
@@ -32,13 +32,28 @@ if prompt := st.chat_input("Digite sua dúvida aqui..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Gera a resposta usando o nosso agente RAG
-    with st.chat_message("assistant"):
-        with st.spinner("Pensando..."):
-            try:
-                resposta = st.session_state.agente.invoke(prompt)
-                st.markdown(resposta)
-                # Salva a resposta no histórico
-                st.session_state.messages.append({"role": "assistant", "content": resposta})
-            except Exception as e:
-                st.error(f"Erro ao processar a resposta: {e}")
+    # NOVO: Intercepta palavras de encerramento antes de mandar para a IA
+    palavra_limpa = prompt.strip().lower()
+    if palavra_limpa in ['sair', 'fechar', 'exit', 'encerrar', 'tchau']:
+        resposta_despedida = "Atendimento encerrado. A Animal Pets agradece o seu contato! Se precisar de algo mais, basta digitar uma nova mensagem."
+        
+        with st.chat_message("assistant"):
+            st.markdown(resposta_despedida)
+        
+        st.session_state.messages.append({"role": "assistant", "content": resposta_despedida})
+        
+        # Opcional: Se quiser limpar a tela totalmente ao sair, descomente a linha abaixo:
+        # st.session_state.messages = []
+        
+    else:
+        # Gera a resposta normal usando o nosso agente RAG
+        with st.chat_message("assistant"):
+            with st.spinner("Pensando..."):
+                try:
+                    resposta = st.session_state.agente.invoke(prompt)
+                    st.markdown(resposta)
+                    # Salva a resposta no histórico
+                    st.session_state.messages.append({"role": "assistant", "content": resposta})
+                except Exception as e:
+                    st.error(f"Erro ao processar a resposta: {e}")
+
